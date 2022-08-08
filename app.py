@@ -31,9 +31,6 @@ creds_dict = {
     "client_x509_cert_url": os.getenv('client_x509_cert_url'),
 }
 creds_dict["private_key"] = creds_dict["private_key"].replace("\\\\n", "\n")
-print(json_creds)
-print("-"*30)
-pprint(creds_dict)
 gc = gspread.service_account_from_dict(creds_dict)
 
 app = Flask(__name__)
