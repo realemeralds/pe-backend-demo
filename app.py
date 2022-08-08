@@ -19,6 +19,8 @@ scopes = [
 ]
 
 creds_dict = json.loads(json_creds)
+print(json_creds)
+print("-"*30)
 pprint(creds_dict)
 gc = gspread.service_account_from_dict(creds_dict)
 
