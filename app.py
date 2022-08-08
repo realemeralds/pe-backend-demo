@@ -4,6 +4,7 @@ from flask_cors import CORS
 import json
 import os
 from dotenv import load_dotenv
+from pprint import pprint
 
 import gspread
 from gspread_formatting import *
@@ -18,6 +19,7 @@ scopes = [
 ]
 
 creds_dict = json.loads(json_creds)
+pprint(creds_dict)
 gc = gspread.service_account_from_dict(creds_dict)
 
 app = Flask(__name__)
@@ -83,12 +85,15 @@ def post():
         id: string -> corresponding to id of student,
         data: {
             int from 1-4 (coresponding to column): True / False 
-        } 
+        }, 
+        password: myPassword
     }
     '''
     r = request
     rDict = r.json
     print(rDict)
+    if rDict.get("password", None) != os.getenv('PASSWORD'):
+        return jsonify({"status": "error", "error": "Invalid password..."})
     index = rDict.get("id", None)
     if index:
         row = ws.find(index, in_column=1).row
