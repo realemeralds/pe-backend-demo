@@ -102,7 +102,6 @@ def post():
     '''
     r = request
     rDict = r.json
-    print(rDict)
     if rDict.get("password", None) != os.getenv('PASSWORD'):
         return jsonify({"status": "error", "error": "Invalid password..."})
     index = rDict.get("id", None)
