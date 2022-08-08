@@ -1,10 +1,27 @@
-from turtle import st
 from flask import Flask, jsonify, request
+from flask_cors import CORS
+
+import json
+import os
+from dotenv import load_dotenv
+
 import gspread
+from gspread_formatting import *
+
 from faker import Faker
 
-gc = gspread.service_account()
+load_dotenv()
+json_creds = os.getenv('GOOGLE_SHEETS_CREDS_JSON')
+scopes = [
+    'https://www.googleapis.com/auth/spreadsheets',
+    'https://www.googleapis.com/auth/drive'
+]
+
+creds_dict = json.loads(json_creds)
+gc = gspread.service_account_from_dict(creds_dict)
+
 app = Flask(__name__)
+CORS(app)
 fake = Faker()
 Faker.seed(4321)
 
@@ -23,10 +40,32 @@ def index():
     names = [[i] + [fake.unique.name(), f"5{str(int(i >= 100))}{(i//10 + 1) % 10}"] + [
         "FALSE"]*4 for i in range(1, 200)]
     ws.delete_rows(3, 201)
-    ws.append_rows(names)
+    ws.append_rows(names, value_input_option='USER_ENTERED')
     print("appended?")
     print(names)
+
+    # add checkboxes
+    validation_rule = DataValidationRule(
+        # condition'type' and 'values', defaulting to TRUE/FALSE
+        BooleanCondition('BOOLEAN', []),
+        showCustomUi=True
+    )
+    set_data_validation_for_cell_range(ws, "D3:G201", validation_rule)
     return jsonify({"status": "Successfully populated database!",  "data": names_list[2:]})
+
+
+@app.route("/students")
+def getStudents():
+    if (ws.acell("A100").value == None):
+        return jsonify({"status": "error", "error": "Data not populated! Visit /load first."})
+    rowNames = ws.get("A2:C2")
+    studentArray = []
+    for student in ws.get("A3:C201"):
+        itemDict = {}
+        for index, item in enumerate(student):
+            itemDict[rowNames[0][index].lower()] = item
+        studentArray.append(itemDict)
+    return jsonify(studentArray)
 
 
 @app.route("/")
@@ -36,6 +75,17 @@ def get():
 
 @app.route("/post", methods=["POST"])
 def post():
+    '''
+    Changes the checkboxes in the spreadsheet.
+
+    HTTP POST request - JSON body:
+    {
+        id: string -> corresponding to id of student,
+        data: {
+            int from 1-4 (coresponding to column): True / False 
+        } 
+    }
+    '''
     r = request
     rDict = r.json
     print(rDict)
@@ -45,12 +95,14 @@ def post():
         data = rDict.get("data", [])
         status = []
         for k, v in data.items():
-            ws.update(f"{chr(64+col_offset+int(k))}{row}",
-                      str(bool(v)).upper(), raw=False)
+            if v:
+                cell = f"{chr(64+col_offset+int(k))}{row}"
+                ws.update(cell,
+                          str(ws.acell(cell).value != "TRUE").upper(), raw=False)
             status.append(
-                f"updated cell {chr(64+col_offset+int(k))}{row} with value {str(bool(v)).upper()}")
+                f"updated cell {chr(64+col_offset+int(k))}{row} with value {ws.acell(cell).value}")
             print(
-                f"updated cell {chr(64+col_offset+int(k))}{row} with value {str(bool(v)).upper()}")
+                f"updated cell {chr(64+col_offset+int(k))}{row} with value {ws.acell(cell).value}")
     else:
         index = rDict.get("name", None)
         if index == None:
@@ -59,4 +111,4 @@ def post():
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=True, host="0.0.0.0")
